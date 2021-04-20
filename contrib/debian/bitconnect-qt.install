@@ -1,0 +1,11 @@
+usr/local/bin/bitconnect-qt usr/bin
+share/pixmaps/bitconnect16.png usr/share/pixmaps
+share/pixmaps/bitconnect32.png usr/share/pixmaps
+share/pixmaps/bitconnect128.png usr/share/pixmaps
+share/pixmaps/bitconnect256.png usr/share/pixmaps
+share/pixmaps/bitconnect-testnet32.png usr/share/pixmaps
+share/pixmaps/bitconnect-testnet128.png usr/share/pixmaps
+share/pixmaps/bitconnect-testnet256.png usr/share/pixmaps
+debian/bitconnect-qt.desktop usr/share/applications
+debian/bitconnect-testnet-qt.desktop usr/share/applications
+debian/bitconnect-qt.protocol usr/share/kde4/services/

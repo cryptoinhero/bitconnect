@@ -1,0 +1,11 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Bitconnect (testnet)
+Comment=Desktop wallet for Bitconnect Cryptocurrency (testnet)
+Comment[de]=Offizieller Client für die Kryptowährung Bitconnect (testnet)
+Exec=bitconnect-qt -testnet %u
+Terminal=false
+Type=Application
+Icon=/usr/share/pixmaps/bitconnect-testnet128.png
+MimeType=x-scheme-handler/bitconnect;
+Categories=Application;Network;
