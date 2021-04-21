@@ -137,7 +137,7 @@ public:
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x88, 0xAD, 0xE4};
 
         // human readable prefix to bench32 address
-        bech32_hrp = "pc";
+        bech32_hrp = "bcc";
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_main, pnSeed6_main + ARRAYLEN(pnSeed6_main));
 
@@ -226,7 +226,7 @@ public:
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
 
         // human readable prefix to bench32 address
-        bech32_hrp = "tpc";
+        bech32_hrp = "tbcc";
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
 
@@ -323,7 +323,7 @@ public:
         base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
 
-        bech32_hrp = "pcrt";
+        bech32_hrp = "bccrt";
 
         fMiningRequiresPeers = false;
         fDefaultConsistencyChecks = true;

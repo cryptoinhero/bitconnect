@@ -29,15 +29,15 @@ unsigned int nProtocolV05SwitchTime     = 1461700000;
 unsigned int nProtocolV05TestSwitchTime = 1447700000;
 // Protocol switch time of v0.6 kernel protocol
 // supermajority hardfork: actual fork will happen later than switch time
-const unsigned int nProtocolV06SwitchTime     = 1615384800; // Tue 12 Dec 03:40:00 UTC 2017
-const unsigned int nProtocolV06TestSwitchTime = 1615384800; // Tue 17 Oct 00:00:00 UTC 2017
+const unsigned int nProtocolV06SwitchTime     = 1652140800; // Tue 12 Dec 03:40:00 UTC 2017
+const unsigned int nProtocolV06TestSwitchTime = 1652140800; // Tue 17 Oct 00:00:00 UTC 2017
 // Protocol switch time for 0.7 kernel protocol
-const unsigned int nProtocolV07SwitchTime     = 1615384800; // Tue 12 Mar 12:00:00 UTC 2019
-const unsigned int nProtocolV07TestSwitchTime = 1615384800; // Tue 06 Nov 12:00:00 UTC 2018
+const unsigned int nProtocolV07SwitchTime     = 1652140800; // Tue 12 Mar 12:00:00 UTC 2019
+const unsigned int nProtocolV07TestSwitchTime = 1652140800; // Tue 06 Nov 12:00:00 UTC 2018
 
 // Switch time for new BIPs from bitcoin 0.16.x
-const uint32_t nBTC16BIPsSwitchTime = 1615384800; // Tue 01 Oct 12:00:00 UTC 2019
-const uint32_t nBTC16BIPsTestSwitchTime = 1615384800; // Tue 09 Apr 12:00:00 UTC 2019
+const uint32_t nBTC16BIPsSwitchTime = 1652140800; // Tue 01 Oct 12:00:00 UTC 2019
+const uint32_t nBTC16BIPsTestSwitchTime = 1652140800; // Tue 09 Apr 12:00:00 UTC 2019
 
 // Hard checkpoints of stake modifiers to ensure they are deterministic
 static std::map<int, unsigned int> mapStakeModifierCheckpoints =
