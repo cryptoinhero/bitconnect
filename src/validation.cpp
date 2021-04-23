@@ -2976,14 +2976,7 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, bool fProofOfS
     const Consensus::Params& consensusParams = params.GetConsensus();
     if (nHeight > consensusParams.nLastPOWBlock) fProofOfStake = true;
     unsigned int nBitsRequired = GetNextTargetRequired(pindexPrev, fProofOfStake, consensusParams);
-    // LogPrintf("============================================%s\n", fProofOfStake);
     if (block.nBits != nBitsRequired) {
-        /*if ((block.nTime == (uint32_t) consensusParams.nBccBadBlockTime) &&
-                (block.nBits == (uint32_t) consensusParams.nBccBadBlockBits)) {
-            // accept BCC block minted with incorrect proof of stake threshold
-            return true;
-        } */       
-        //if (block.nTime < 1611716270) return true;
         return state.DoS(100, false, REJECT_INVALID, "bad-diffbits", false, "incorrect proof of work/proof-of-stake");
     }
 

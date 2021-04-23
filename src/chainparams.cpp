@@ -97,9 +97,6 @@ public:
         // By default assume that the signatures in ancestors of this block are valid.
         consensus.defaultAssumeValid = uint256S("0xa3a0ffa0dbca75923ad6a53d3878d62f8b35c363282df3f13ded9e4fda921e63");  // 380000
 
-        // validation by-pass
-        consensus.nBccBadBlockTime = 1552755546;    // Skip nBit validation of Block 830703 per PR #915
-        consensus.nBccBadBlockBits = 0x1e0efe19;    // Skip nBit validation of Block 830703 per PR #915        
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
