@@ -184,6 +184,8 @@ public:
     bool RewindBlockIndex(const CChainParams& params);
     bool LoadGenesisBlock(const CChainParams& chainparams);
 
+    void PruneBlockIndexCandidates();
+
     void UnloadBlockIndex();
 
 private:
@@ -2278,6 +2280,18 @@ CBlockIndex* CChainState::FindMostWorkChain() {
     } while(true);
 }
 
+/** Delete all entries in setBlockIndexCandidates that are worse than the current tip. */
+void CChainState::PruneBlockIndexCandidates() {
+    // Note that we can't delete the current block itself, as we may need to return to it later in case a
+    // reorganization to a better block fails.
+    std::set<CBlockIndex*, CBlockIndexWorkComparator>::iterator it = setBlockIndexCandidates.begin();
+    while (it != setBlockIndexCandidates.end() && setBlockIndexCandidates.value_comp()(*it, chainActive.Tip())) {
+        setBlockIndexCandidates.erase(it++);
+    }
+    // Either the current tip or a successor of it we're working towards is left in setBlockIndexCandidates.
+    assert(!setBlockIndexCandidates.empty());
+}
+
 /**
  * Try to make some progress towards making pindexMostWork the active block.
  * pblock is either nullptr or a pointer to a CBlock corresponding to pindexMostWork.
@@ -2338,6 +2352,7 @@ bool CChainState::ActivateBestChainStep(CValidationState& state, const CChainPar
                     return false;
                 }
             } else {
+                PruneBlockIndexCandidates();
                 if (!pindexOldTip || chainActive.Tip()->nChainTrust > pindexOldTip->nChainTrust) {
                     // We're in a better position than we were. Return temporarily to release the lock.
                     fContinue = false;
@@ -2512,6 +2527,7 @@ bool CChainState::PreciousBlock(CValidationState& state, const CChainParams& par
         }
         if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && pindex->nChainTx) {
             setBlockIndexCandidates.insert(pindex);
+            PruneBlockIndexCandidates();
         }
     }
 
@@ -3620,6 +3636,8 @@ bool LoadChainTip(const CChainParams& chainparams)
         return false;
     chainActive.SetTip(it->second);
 
+    g_chainstate.PruneBlockIndexCandidates();
+
     LogPrintf("Loaded best chain: hashBestChain=%s height=%d date=%s progress=%f\n",
         chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(),
         DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
@@ -3884,6 +3902,10 @@ bool CChainState::RewindBlockIndex(const CChainParams& params)
     }
 
     if (chainActive.Tip() != nullptr) {
+        // We can't prune block index candidates based on our tip if we have
+        // no tip due to chainActive being empty!
+        PruneBlockIndexCandidates();
+
         CheckBlockIndex(params.GetConsensus());
     }
 
