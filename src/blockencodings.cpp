@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2017 The Bitcoin Core developers
+// Copyright (c) 2016-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -6,12 +6,13 @@
 #include <consensus/consensus.h>
 #include <consensus/validation.h>
 #include <chainparams.h>
-#include <hash.h>
+#include <crypto/sha256.h>
+#include <crypto/siphash.h>
 #include <random.h>
 #include <streams.h>
 #include <txmempool.h>
 #include <validation.h>
-#include <util.h>
+#include <util/system.h>
 
 #include <unordered_map>
 
@@ -21,6 +22,7 @@ CBlockHeaderAndShortTxIDs::CBlockHeaderAndShortTxIDs(const CBlock& block, bool f
     FillShortTxIDSelector();
     //TODO: Use our mempool prior to block acceptance to predictively fill more than just the coinbase
     prefilledtxn[0] = {0, block.vtx[0]};
+    header.nFlags = block.nFlags;
     for (size_t i = 1; i < block.vtx.size(); i++) {
         const CTransaction& tx = *block.vtx[i];
         shorttxids[i - 1] = GetShortID(fUseWTXID ? tx.GetWitnessHash() : tx.GetHash());
@@ -163,7 +165,7 @@ ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs& c
             break;
     }
 
-    LogPrint(BCLog::CMPCTBLOCK, "Initialized PartiallyDownloadedBlock for block %s using a cmpctblock of size %lu\n", cmpctblock.header.GetHash().ToString(), GetSerializeSize(cmpctblock, SER_NETWORK, PROTOCOL_VERSION));
+    LogPrint(BCLog::CMPCTBLOCK, "Initialized PartiallyDownloadedBlock for block %s using a cmpctblock of size %lu\n", cmpctblock.header.GetHash().ToString(), GetSerializeSize(cmpctblock, PROTOCOL_VERSION));
 
     return READ_STATUS_OK;
 }
@@ -198,13 +200,13 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(CBlock& block, const std::vector<
     if (vtx_missing.size() != tx_missing_offset)
         return READ_STATUS_INVALID;
 
-    CValidationState state;
+    BlockValidationState state;
     if (!CheckBlock(block, state, Params().GetConsensus())) {
         // TODO: We really want to just check merkle tree manually here,
         // but that is expensive, and CheckBlock caches a block's
         // "checked-status" (in the CBlock?). CBlock should be able to
         // check its own merkle root and cache that check.
-        if (state.CorruptionPossible())
+        if (state.GetResult() == BlockValidationResult::BLOCK_MUTATED)
             return READ_STATUS_FAILED; // Possible Short ID collision
         return READ_STATUS_CHECKBLOCK_FAILED;
     }

@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2017 The Bitcoin Core developers
+// Copyright (c) 2009-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,7 +14,7 @@
 #error Client version information missing: version is not defined by bitcoin-config.h or in any other way
 #endif
 
-#if !defined(BITCONNECT_VERSION_MAJOR) || !defined(BITCONNECT_VERSION_MINOR) || !defined(BITCONNECT_VERSION_REVISION) || !defined(BITCONNECT_VERSION_BUILD)
+#if !defined(PEERCOIN_VERSION_MAJOR) || !defined(PEERCOIN_VERSION_MINOR) || !defined(PEERCOIN_VERSION_REVISION) || !defined(PEERCOIN_VERSION_BUILD)
 #error Client version information missing: version is not defined by bitcoin-config.h or in any other way
 #endif
 
@@ -45,12 +45,12 @@ static const int CLIENT_VERSION =
                          +     100 * CLIENT_VERSION_REVISION
                          +       1 * CLIENT_VERSION_BUILD;
 
-// note: bitconnect version is used for display purpose AND to accept alerts
-static const int BITCONNECT_VERSION =
-                           1000000 * BITCONNECT_VERSION_MAJOR
-                         +   10000 * BITCONNECT_VERSION_MINOR
-                         +     100 * BITCONNECT_VERSION_REVISION
-                         +       1 * BITCONNECT_VERSION_BUILD;
+// note: peercoin version is used for display purpose AND to accept alerts
+static const int PEERCOIN_VERSION =
+                           1000000 * PEERCOIN_VERSION_MAJOR
+                         +   10000 * PEERCOIN_VERSION_MINOR
+                         +     100 * PEERCOIN_VERSION_REVISION
+                         +       1 * PEERCOIN_VERSION_BUILD;
 
 extern const std::string CLIENT_NAME;
 extern const std::string CLIENT_BUILD;

@@ -1,17 +1,16 @@
-// Copyright (c) 2015-2017 The Bitcoin Core developers
+// Copyright (c) 2015-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <bench/bench.h>
-#include <validation.h>
-#include <utiltime.h>
+#include <util/time.h>
 
 // Sanity test: this should loop ten times, and
 // min/max/average should be close to 100ms.
 static void Sleep100ms(benchmark::State& state)
 {
     while (state.KeepRunning()) {
-        MilliSleep(100);
+        UninterruptibleSleep(std::chrono::milliseconds{100});
     }
 }
 

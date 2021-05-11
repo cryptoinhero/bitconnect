@@ -1,20 +1,23 @@
-// Copyright (c) 2012-2017 The Bitcoin Core developers
+// Copyright (c) 2012-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <rpc/server.h>
 #include <rpc/client.h>
+#include <rpc/util.h>
 
-#include <base58.h>
 #include <core_io.h>
-#include <netbase.h>
-
-#include <test/test_bitcoin.h>
+#include <interfaces/chain.h>
+#include <node/context.h>
+#include <test/util/setup_common.h>
+#include <util/time.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include <univalue.h>
+
+#include <rpc/blockchain.h>
 
 UniValue CallRPC(std::string args)
 {
@@ -26,10 +29,9 @@ UniValue CallRPC(std::string args)
     request.strMethod = strMethod;
     request.params = RPCConvertValues(strMethod, vArgs);
     request.fHelp = false;
-    BOOST_CHECK(tableRPC[strMethod]);
-    rpcfn_type method = tableRPC[strMethod]->actor;
+    if (RPCIsInWarmup(nullptr)) SetRPCWarmupFinished();
     try {
-        UniValue result = (*method)(request);
+        UniValue result = tableRPC.execute(request);
         return result;
     }
     catch (const UniValue& objError) {
@@ -52,7 +54,6 @@ BOOST_AUTO_TEST_CASE(rpc_rawparams)
     BOOST_CHECK_THROW(CallRPC("createrawtransaction"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("createrawtransaction null null"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("createrawtransaction not_array"), std::runtime_error);
-    BOOST_CHECK_THROW(CallRPC("createrawtransaction [] []"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("createrawtransaction {} {}"), std::runtime_error);
     BOOST_CHECK_NO_THROW(CallRPC("createrawtransaction [] {}"));
     BOOST_CHECK_THROW(CallRPC("createrawtransaction [] {} extra"), std::runtime_error);
@@ -60,22 +61,14 @@ BOOST_AUTO_TEST_CASE(rpc_rawparams)
     BOOST_CHECK_THROW(CallRPC("decoderawtransaction"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("decoderawtransaction null"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("decoderawtransaction DEADBEEF"), std::runtime_error);
-    std::string rawtx = "0100000001a15d57094aa7a21a28cb20b59aab8fc7d1149a3bdbcddba9c622e4f5f6a99ece010000006c493046022100f93bb0e7d8db7bd46e40132d1f8242026e045f03a0efe71bbb8e3f475e970d790221009337cd7f1f929f00cc6ff01f03729b069a7c21b59b1736ddfee5db5946c5da8c0121033b9b137ee87d5a812d6f506efdd37f0affa7ffc310711c06c7f3e097c9447c52ffffffff0100e1f505000000001976a9140389035a9225b3839e2bbf32d826a1e222031fd888ac00000000";
+    std::string rawtx = "010000001209a35e0150afd8cc27e9f6bdfdda98bdcb5cf9ffe82b479bb969e908ff0e2357ecd765c00100000048473044022077a33181fed749626ba02d41db813f53e61be4ad0b8d856fecda5977932559300220260106f50d83b82368192ae4ac4c3697951449bff18d266e25356a6d91e97de701ffffffff0300000000000000000008287e010000000023210327f1f1fc8fbd47411ab995879dbdc9f6db8f41a762ee86d028a0ca063e36b175acc82b7e010000000023210327f1f1fc8fbd47411ab995879dbdc9f6db8f41a762ee86d028a0ca063e36b175ac00000000";
     BOOST_CHECK_NO_THROW(r = CallRPC(std::string("decoderawtransaction ")+rawtx));
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "size").get_int(), 193);
+    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "size").get_int(), 224);
     BOOST_CHECK_EQUAL(find_value(r.get_obj(), "version").get_int(), 1);
     BOOST_CHECK_EQUAL(find_value(r.get_obj(), "locktime").get_int(), 0);
     BOOST_CHECK_THROW(CallRPC(std::string("decoderawtransaction ")+rawtx+" extra"), std::runtime_error);
     BOOST_CHECK_NO_THROW(r = CallRPC(std::string("decoderawtransaction ")+rawtx+" false"));
     BOOST_CHECK_THROW(r = CallRPC(std::string("decoderawtransaction ")+rawtx+" false extra"), std::runtime_error);
-
-    BOOST_CHECK_THROW(CallRPC("signrawtransaction"), std::runtime_error);
-    BOOST_CHECK_THROW(CallRPC("signrawtransaction null"), std::runtime_error);
-    BOOST_CHECK_THROW(CallRPC("signrawtransaction ff00"), std::runtime_error);
-    BOOST_CHECK_NO_THROW(CallRPC(std::string("signrawtransaction ")+rawtx));
-    BOOST_CHECK_NO_THROW(CallRPC(std::string("signrawtransaction ")+rawtx+" null null NONE|ANYONECANPAY"));
-    BOOST_CHECK_NO_THROW(CallRPC(std::string("signrawtransaction ")+rawtx+" [] [] NONE|ANYONECANPAY"));
-    BOOST_CHECK_THROW(CallRPC(std::string("signrawtransaction ")+rawtx+" null null badenum"), std::runtime_error);
 
     // Only check failure cases for sendrawtransaction, there's no network to send to...
     BOOST_CHECK_THROW(CallRPC("sendrawtransaction"), std::runtime_error);
@@ -112,25 +105,22 @@ BOOST_AUTO_TEST_CASE(rpc_rawsign)
     // input is a 1-of-2 multisig (so is output):
     std::string prevout =
       "[{\"txid\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
-      "\"vout\":1,\"scriptPubKey\":\"a914b10c9df5f7edf436c697f02f1efdba4cf399615187\","
-      "\"redeemScript\":\"512103debedc17b3df2badbcdd86d5feb4562b86fe182e5998abd8bcd4f122c6155b1b21027e940bb73ab8732bfdf7f9216ecefca5b94d6df834e77e108f68e66f126044c052ae\"}]";
+      "\"vout\":1,\"scriptPubKey\":\"a914809941f7fdb9675963477e0da14c66390a84ccac87\","
+      "\"redeemScript\":\"5221038024dd4e955f93fa4ba5a9d7c9f01d2419fe6d7ae0d2aaaed6fe32aff0b8ebfa2103ba8d94305d366d30d5a41a658b5e2859d00d43c870dc0a3cdda7e52ddb4ff20652ae\"}]";
     r = CallRPC(std::string("createrawtransaction ")+prevout+" "+
-      "{\"3HqAe9LtNBjnsfM4CyYaWTnvCaUYT7v4oZ\":11}");
+      "{\"PKhs4P7KEUv1GCUbcxYEx1fEBFc7yyfsm9\":11}");
     std::string notsigned = r.get_str();
-    std::string privkey1 = "\"KzsXybp9jX64P5ekX1KUxRQ79Jht9uzW7LorgwE65i5rWACL6LQe\"";
-    std::string privkey2 = "\"Kyhdf5LuKTRx4ge69ybABsiUAWjVRK4XGxAKk2FQLp2HjGMy87Z4\"";
-    r = CallRPC(std::string("signrawtransaction ")+notsigned+" "+prevout+" "+"[]");
+    std::string privkey1 = "\"U9MHK7o3WQbCD4kNJAye1PtHDKBCn9LU2BGwQJaqcsQqPcDAVSYc\"";
+    std::string privkey2 = "\"UA6rEKCCjpYG4V6AQfcd9V7ZZZzcHBT1M5CtTyq3jwnQNgrdkbd1\"";
+    r = CallRPC(std::string("signrawtransactionwithkey ")+notsigned+" [] "+prevout);
     BOOST_CHECK(find_value(r.get_obj(), "complete").get_bool() == false);
-    r = CallRPC(std::string("signrawtransaction ")+notsigned+" "+prevout+" "+"["+privkey1+","+privkey2+"]");
+    r = CallRPC(std::string("signrawtransactionwithkey ")+notsigned+" ["+privkey1+","+privkey2+"] "+prevout);
     BOOST_CHECK(find_value(r.get_obj(), "complete").get_bool() == true);
 }
 
 BOOST_AUTO_TEST_CASE(rpc_createraw_op_return)
 {
     BOOST_CHECK_NO_THROW(CallRPC("createrawtransaction [{\"txid\":\"a3b807410df0b60fcb9736768df5823938b2f838694939ba45f3c0a1bff150ed\",\"vout\":0}] {\"data\":\"68656c6c6f776f726c64\"}"));
-
-    // Allow more than one data transaction output
-    BOOST_CHECK_NO_THROW(CallRPC("createrawtransaction [{\"txid\":\"a3b807410df0b60fcb9736768df5823938b2f838694939ba45f3c0a1bff150ed\",\"vout\":0}] {\"data\":\"68656c6c6f776f726c64\",\"data\":\"68656c6c6f776f726c64\"}"));
 
     // Key not "data" (bad address)
     BOOST_CHECK_THROW(CallRPC("createrawtransaction [{\"txid\":\"a3b807410df0b60fcb9736768df5823938b2f838694939ba45f3c0a1bff150ed\",\"vout\":0}] {\"somedata\":\"68656c6c6f776f726c64\"}"), std::runtime_error);
@@ -145,37 +135,35 @@ BOOST_AUTO_TEST_CASE(rpc_createraw_op_return)
 
 BOOST_AUTO_TEST_CASE(rpc_format_monetary_values)
 {
-    BOOST_CHECK(ValueFromAmount(0LL).write() == "0.00000000");
-    BOOST_CHECK(ValueFromAmount(1LL).write() == "0.00000001");
-    BOOST_CHECK(ValueFromAmount(17622195LL).write() == "0.17622195");
-    BOOST_CHECK(ValueFromAmount(50000000LL).write() == "0.50000000");
-    BOOST_CHECK(ValueFromAmount(89898989LL).write() == "0.89898989");
-    BOOST_CHECK(ValueFromAmount(100000000LL).write() == "1.00000000");
-    BOOST_CHECK(ValueFromAmount(2099999999999990LL).write() == "20999999.99999990");
-    BOOST_CHECK(ValueFromAmount(2099999999999999LL).write() == "20999999.99999999");
+    BOOST_CHECK(ValueFromAmount(0LL).write() == "0.000000");
+    BOOST_CHECK(ValueFromAmount(1LL).write() == "0.000001");
+    BOOST_CHECK(ValueFromAmount(176221LL).write() == "0.176221");
+    BOOST_CHECK(ValueFromAmount(500000LL).write() == "0.500000");
+    BOOST_CHECK(ValueFromAmount(898989LL).write() == "0.898989");
+    BOOST_CHECK(ValueFromAmount(1000000LL).write() == "1.000000");
+    BOOST_CHECK(ValueFromAmount(20999999999990LL).write() == "20999999.999990");
+    BOOST_CHECK(ValueFromAmount(20999999999999LL).write() == "20999999.999999");
 
-    BOOST_CHECK_EQUAL(ValueFromAmount(0).write(), "0.00000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount((COIN/10000)*123456789).write(), "12345.67890000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(-COIN).write(), "-1.00000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(-COIN/10).write(), "-0.10000000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(0).write(), "0.000000");
+    BOOST_CHECK_EQUAL(ValueFromAmount((COIN/10000)*123456789).write(), "12345.678900");
+    BOOST_CHECK_EQUAL(ValueFromAmount(-COIN).write(), "-1.000000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(-COIN/10).write(), "-0.100000");
 
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*100000000).write(), "100000000.00000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*10000000).write(), "10000000.00000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*1000000).write(), "1000000.00000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*100000).write(), "100000.00000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*10000).write(), "10000.00000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*1000).write(), "1000.00000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*100).write(), "100.00000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*10).write(), "10.00000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN).write(), "1.00000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/10).write(), "0.10000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/100).write(), "0.01000000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/1000).write(), "0.00100000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/10000).write(), "0.00010000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/100000).write(), "0.00001000");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/1000000).write(), "0.00000100");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/10000000).write(), "0.00000010");
-    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/100000000).write(), "0.00000001");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*100000000).write(), "100000000.000000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*10000000).write(), "10000000.000000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*1000000).write(), "1000000.000000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*100000).write(), "100000.000000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*10000).write(), "10000.000000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*1000).write(), "1000.000000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*100).write(), "100.000000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN*10).write(), "10.000000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN).write(), "1.000000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/10).write(), "0.100000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/100).write(), "0.010000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/1000).write(), "0.001000");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/10000).write(), "0.000100");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/100000).write(), "0.000010");
+    BOOST_CHECK_EQUAL(ValueFromAmount(COIN/1000000).write(), "0.000001");
 }
 
 static UniValue ValueFromString(const std::string &str)
@@ -187,30 +175,35 @@ static UniValue ValueFromString(const std::string &str)
 
 BOOST_AUTO_TEST_CASE(rpc_parse_monetary_values)
 {
-    BOOST_CHECK_THROW(AmountFromValue(ValueFromString("-0.00000001")), UniValue);
+    BOOST_CHECK_THROW(AmountFromValue(ValueFromString("-0.000001")), UniValue);
     BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0")), 0LL);
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.00000000")), 0LL);
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.00000001")), 1LL);
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.17622195")), 17622195LL);
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.5")), 50000000LL);
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.50000000")), 50000000LL);
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.89898989")), 89898989LL);
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("1.00000000")), 100000000LL);
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("20999999.9999999")), 2099999999999990LL);
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("20999999.99999999")), 2099999999999999LL);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.000000")), 0LL);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.000001")), 1LL);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.176221")), 176221LL);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.5")), 500000LL);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.500000")), 500000LL);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.898989")), 898989LL);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("1.000000")), 1000000LL);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("20999999.99999")), 20999999999990LL);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("20999999.999999")), 20999999999999LL);
 
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("1e-8")), COIN/100000000);
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.1e-7")), COIN/100000000);
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.01e-6")), COIN/100000000);
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.0000000000000000000000000000000000000000000000000000000000000000000000000001e+68")), COIN/100000000);
+    // check that fix 37df99c3856c1d9e81d895425ea395311d42dc1d works
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.00000111")), 1LL);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.00000199")), 1LL);
+    BOOST_CHECK_THROW(AmountFromValue(ValueFromString("0.000001009")), UniValue);
+
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("1e-6")), COIN/1000000);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.1e-5")), COIN/1000000);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.01e-4")), COIN/1000000);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.00000000000000000000000000000000000000000000000000000000000000000000000001e+68")), COIN/1000000);
     BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("10000000000000000000000000000000000000000000000000000000000000000e-64")), COIN);
     BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000e64")), COIN);
 
     BOOST_CHECK_THROW(AmountFromValue(ValueFromString("1e-9")), UniValue); //should fail
     BOOST_CHECK_THROW(AmountFromValue(ValueFromString("0.000000019")), UniValue); //should fail
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.00000001000000")), 1LL); //should pass, cut trailing 0
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.000001000000")), 1LL); //should pass, cut trailing 0
     BOOST_CHECK_THROW(AmountFromValue(ValueFromString("19e-9")), UniValue); //should fail
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.19e-6")), 19); //should pass, leading 0 is present
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.19e-4")), 19); //should pass, leading 0 is present
 
     BOOST_CHECK_THROW(AmountFromValue(ValueFromString("92233720368.54775808")), UniValue); //overflow error
     BOOST_CHECK_THROW(AmountFromValue(ValueFromString("1e+11")), UniValue); //overflow error
@@ -227,7 +220,8 @@ BOOST_AUTO_TEST_CASE(json_parse_errors)
     BOOST_CHECK_EQUAL(ParseNonRFCJSONValue("1.0 ").get_real(), 1.0);
 
     BOOST_CHECK_THROW(AmountFromValue(ParseNonRFCJSONValue(".19e-6")), std::runtime_error); //should fail, missing leading 0, therefore invalid JSON
-    BOOST_CHECK_EQUAL(AmountFromValue(ParseNonRFCJSONValue("0.00000000000000000000000000000000000001e+30 ")), 1);
+    BOOST_CHECK_EQUAL(AmountFromValue(ParseNonRFCJSONValue("0.000000000000000000000000000000000001e+30 ")), 1);
+
     // Invalid, initial garbage
     BOOST_CHECK_THROW(ParseNonRFCJSONValue("[1.0"), std::runtime_error);
     BOOST_CHECK_THROW(ParseNonRFCJSONValue("a1.0"), std::runtime_error);
@@ -254,7 +248,7 @@ BOOST_AUTO_TEST_CASE(rpc_ban)
     BOOST_CHECK_NO_THROW(CallRPC(std::string("setban 127.0.0.0 remove")));
     BOOST_CHECK_NO_THROW(r = CallRPC(std::string("listbanned")));
     ar = r.get_array();
-    BOOST_CHECK_EQUAL(ar.size(), 0);
+    BOOST_CHECK_EQUAL(ar.size(), 0U);
 
     BOOST_CHECK_NO_THROW(r = CallRPC(std::string("setban 127.0.0.0/24 add 9907731200 true")));
     BOOST_CHECK_NO_THROW(r = CallRPC(std::string("listbanned")));
@@ -284,7 +278,7 @@ BOOST_AUTO_TEST_CASE(rpc_ban)
     BOOST_CHECK_NO_THROW(CallRPC(std::string("setban 127.0.0.0/24 remove")));
     BOOST_CHECK_NO_THROW(r = CallRPC(std::string("listbanned")));
     ar = r.get_array();
-    BOOST_CHECK_EQUAL(ar.size(), 0);
+    BOOST_CHECK_EQUAL(ar.size(), 0U);
 
     BOOST_CHECK_NO_THROW(r = CallRPC(std::string("setban 127.0.0.0/255.255.0.0 add")));
     BOOST_CHECK_THROW(r = CallRPC(std::string("setban 127.0.1.1 add")), std::runtime_error);
@@ -292,7 +286,7 @@ BOOST_AUTO_TEST_CASE(rpc_ban)
     BOOST_CHECK_NO_THROW(CallRPC(std::string("clearbanned")));
     BOOST_CHECK_NO_THROW(r = CallRPC(std::string("listbanned")));
     ar = r.get_array();
-    BOOST_CHECK_EQUAL(ar.size(), 0);
+    BOOST_CHECK_EQUAL(ar.size(), 0U);
 
 
     BOOST_CHECK_THROW(r = CallRPC(std::string("setban test add")), std::runtime_error); //invalid IP
@@ -343,6 +337,84 @@ BOOST_AUTO_TEST_CASE(rpc_convert_values_generatetoaddress)
     BOOST_CHECK_EQUAL(result[0].get_int(), 1);
     BOOST_CHECK_EQUAL(result[1].get_str(), "mhMbmE2tE9xzJYCV9aNC8jKWN31vtGrguU");
     BOOST_CHECK_EQUAL(result[2].get_int(), 9);
+}
+
+BOOST_AUTO_TEST_CASE(rpc_getblockstats_calculate_percentiles_by_weight)
+{
+    int64_t total_weight = 200;
+    std::vector<std::pair<CAmount, int64_t>> feerates;
+    CAmount result[NUM_GETBLOCKSTATS_PERCENTILES] = { 0 };
+
+    for (int64_t i = 0; i < 100; i++) {
+        feerates.emplace_back(std::make_pair(1 ,1));
+    }
+
+    for (int64_t i = 0; i < 100; i++) {
+        feerates.emplace_back(std::make_pair(2 ,1));
+    }
+
+    CalculatePercentilesByWeight(result, feerates, total_weight);
+    BOOST_CHECK_EQUAL(result[0], 1);
+    BOOST_CHECK_EQUAL(result[1], 1);
+    BOOST_CHECK_EQUAL(result[2], 1);
+    BOOST_CHECK_EQUAL(result[3], 2);
+    BOOST_CHECK_EQUAL(result[4], 2);
+
+    // Test with more pairs, and two pairs overlapping 2 percentiles.
+    total_weight = 100;
+    CAmount result2[NUM_GETBLOCKSTATS_PERCENTILES] = { 0 };
+    feerates.clear();
+
+    feerates.emplace_back(std::make_pair(1, 9));
+    feerates.emplace_back(std::make_pair(2 , 16)); //10th + 25th percentile
+    feerates.emplace_back(std::make_pair(4 ,50)); //50th + 75th percentile
+    feerates.emplace_back(std::make_pair(5 ,10));
+    feerates.emplace_back(std::make_pair(9 ,15));  // 90th percentile
+
+    CalculatePercentilesByWeight(result2, feerates, total_weight);
+
+    BOOST_CHECK_EQUAL(result2[0], 2);
+    BOOST_CHECK_EQUAL(result2[1], 2);
+    BOOST_CHECK_EQUAL(result2[2], 4);
+    BOOST_CHECK_EQUAL(result2[3], 4);
+    BOOST_CHECK_EQUAL(result2[4], 9);
+
+    // Same test as above, but one of the percentile-overlapping pairs is split in 2.
+    total_weight = 100;
+    CAmount result3[NUM_GETBLOCKSTATS_PERCENTILES] = { 0 };
+    feerates.clear();
+
+    feerates.emplace_back(std::make_pair(1, 9));
+    feerates.emplace_back(std::make_pair(2 , 11)); // 10th percentile
+    feerates.emplace_back(std::make_pair(2 , 5)); // 25th percentile
+    feerates.emplace_back(std::make_pair(4 ,50)); //50th + 75th percentile
+    feerates.emplace_back(std::make_pair(5 ,10));
+    feerates.emplace_back(std::make_pair(9 ,15)); // 90th percentile
+
+    CalculatePercentilesByWeight(result3, feerates, total_weight);
+
+    BOOST_CHECK_EQUAL(result3[0], 2);
+    BOOST_CHECK_EQUAL(result3[1], 2);
+    BOOST_CHECK_EQUAL(result3[2], 4);
+    BOOST_CHECK_EQUAL(result3[3], 4);
+    BOOST_CHECK_EQUAL(result3[4], 9);
+
+    // Test with one transaction spanning all percentiles.
+    total_weight = 104;
+    CAmount result4[NUM_GETBLOCKSTATS_PERCENTILES] = { 0 };
+    feerates.clear();
+
+    feerates.emplace_back(std::make_pair(1, 100));
+    feerates.emplace_back(std::make_pair(2, 1));
+    feerates.emplace_back(std::make_pair(3, 1));
+    feerates.emplace_back(std::make_pair(3, 1));
+    feerates.emplace_back(std::make_pair(999999, 1));
+
+    CalculatePercentilesByWeight(result4, feerates, total_weight);
+
+    for (int64_t i = 0; i < NUM_GETBLOCKSTATS_PERCENTILES; i++) {
+        BOOST_CHECK_EQUAL(result4[i], 1);
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

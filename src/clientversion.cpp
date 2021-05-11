@@ -1,4 +1,4 @@
-// Copyright (c) 2012-2017 The Bitcoin Core developers
+// Copyright (c) 2012-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,12 +12,12 @@
  * for both bitcoind and bitcoin-qt, to make it harder for attackers to
  * target servers or GUI users specifically.
  */
-const std::string CLIENT_NAME("Bitconnect");
+const std::string CLIENT_NAME("Satoshi");
 
 /**
  * Client version number
  */
-#define CLIENT_VERSION_SUFFIX ""
+#define CLIENT_VERSION_SUFFIX " Scarab"
 
 
 /**
@@ -43,7 +43,7 @@ const std::string CLIENT_NAME("Bitconnect");
 
 //! git will put "#define GIT_ARCHIVE 1" on the next line inside archives. $Format:%n#define GIT_ARCHIVE 1$
 #ifdef GIT_ARCHIVE
-#define GIT_COMMIT_ID "$Format:%h$"
+#define GIT_COMMIT_ID "$Format:%H$"
 #define GIT_COMMIT_DATE "$Format:%cD$"
 #endif
 
@@ -58,11 +58,11 @@ const std::string CLIENT_NAME("Bitconnect");
 
 #ifndef BUILD_DESC
 #ifdef BUILD_SUFFIX
-#define BUILD_DESC BUILD_DESC_WITH_SUFFIX(BITCONNECT_VERSION_MAJOR, BITCONNECT_VERSION_MINOR, BITCONNECT_VERSION_REVISION, BITCONNECT_VERSION_BUILD, BUILD_SUFFIX)
+#define BUILD_DESC BUILD_DESC_WITH_SUFFIX(PEERCOIN_VERSION_MAJOR, PEERCOIN_VERSION_MINOR, PEERCOIN_VERSION_REVISION, PEERCOIN_VERSION_BUILD, BUILD_SUFFIX)
 #elif defined(GIT_COMMIT_ID)
-#define BUILD_DESC BUILD_DESC_FROM_COMMIT(BITCONNECT_VERSION_MAJOR, BITCONNECT_VERSION_MINOR, BITCONNECT_VERSION_REVISION, BITCONNECT_VERSION_BUILD, GIT_COMMIT_ID)
+#define BUILD_DESC BUILD_DESC_FROM_COMMIT(PEERCOIN_VERSION_MAJOR, PEERCOIN_VERSION_MINOR, PEERCOIN_VERSION_REVISION, PEERCOIN_VERSION_BUILD, GIT_COMMIT_ID)
 #else
-#define BUILD_DESC BUILD_DESC_FROM_UNKNOWN(BITCONNECT_VERSION_MAJOR, BITCONNECT_VERSION_MINOR, BITCONNECT_VERSION_REVISION, BITCONNECT_VERSION_BUILD)
+#define BUILD_DESC BUILD_DESC_FROM_UNKNOWN(PEERCOIN_VERSION_MAJOR, PEERCOIN_VERSION_MINOR, PEERCOIN_VERSION_REVISION, PEERCOIN_VERSION_BUILD)
 #endif
 #endif
 
@@ -81,8 +81,8 @@ std::string FormatFullVersion()
     return CLIENT_BUILD;
 }
 
-/** 
- * Format the subversion field according to BIP 14 spec (https://github.com/bitcoin/bips/blob/master/bip-0014.mediawiki) 
+/**
+ * Format the subversion field according to BIP 14 spec (https://github.com/bitcoin/bips/blob/master/bip-0014.mediawiki)
  */
 std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments)
 {
@@ -98,5 +98,7 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
         ss << ")";
     }
     ss << "/";
+    ss << "Peercoin:" << FormatVersion(PEERCOIN_VERSION);
+    ss << "(" << CLIENT_BUILD << ")/";
     return ss.str();
 }

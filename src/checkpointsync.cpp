@@ -1,4 +1,4 @@
-// Copyright (c) 2012-2020 The Peercoin developers
+// Copyright (c) 2012-2021 The Peercoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
@@ -56,7 +56,6 @@
 #include <validation.h>
 #include <txdb.h>
 #include <consensus/validation.h>
-#include <checkpoints.h>
 #include <chainparams.h>
 #include <base58.h>
 
@@ -69,16 +68,16 @@ const std::string CSyncCheckpoint::strTestPubKey = "046cad3d8254b182a4e5289d01d1
 std::string CSyncCheckpoint::strMasterPrivKey = "";
 
 
-// bitconnect: synchronized checkpoint (centrally broadcasted)
+// peercoin: synchronized checkpoint (centrally broadcasted)
 uint256 hashSyncCheckpoint = uint256();
 uint256 hashPendingCheckpoint = uint256();
 CSyncCheckpoint checkpointMessage;
 CSyncCheckpoint checkpointMessagePending;
 uint256 hashInvalidCheckpoint = uint256();
-CCriticalSection cs_hashSyncCheckpoint;
+RecursiveMutex cs_hashSyncCheckpoint;
 std::string strCheckpointWarning;
 
-// bitconnect: get last synchronized checkpoint
+// peercoin: get last synchronized checkpoint
 CBlockIndex* GetLastSyncCheckpoint()
 {
     LOCK(cs_hashSyncCheckpoint);
@@ -89,7 +88,7 @@ CBlockIndex* GetLastSyncCheckpoint()
     return NULL;
 }
 
-// bitconnect: only descendant of current sync-checkpoint is allowed
+// peercoin: only descendant of current sync-checkpoint is allowed
 bool ValidateSyncCheckpoint(uint256 hashCheckpoint)
 {
     if (!mapBlockIndex.count(hashSyncCheckpoint))
@@ -157,7 +156,7 @@ void SetCheckpointEnforce(bool fEnforce)
     gArgs.ForceSetArg("-enforcecheckpoint", fEnforce ? "1" : "0");
 }
 
-bool AcceptPendingSyncCheckpoint()
+bool AcceptPendingSyncCheckpoint(CConnman* connman)
 {
     LOCK(cs_hashSyncCheckpoint);
     if (hashPendingCheckpoint != uint256() && mapBlockIndex.count(hashPendingCheckpoint))
@@ -188,8 +187,8 @@ bool AcceptPendingSyncCheckpoint()
         checkpointMessagePending.SetNull();
         LogPrintf("AcceptPendingSyncCheckpoint : sync-checkpoint at %s\n", hashSyncCheckpoint.ToString());
         // relay the checkpoint
-        if (g_connman && !checkpointMessage.IsNull())
-            g_connman->ForEachNode([](CNode* pnode) {
+        if (!checkpointMessage.IsNull())
+            connman->ForEachNode([](CNode* pnode) {
                 checkpointMessage.RelayTo(pnode);
             });
         return true;
@@ -239,7 +238,7 @@ bool CheckSyncCheckpoint(const uint256& hashBlock, const CBlockIndex* pindexPrev
 //    return true;
 }
 
-// bitconnect: reset synchronized checkpoint to last hardened checkpoint
+// peercoin: reset synchronized checkpoint to last hardened checkpoint
 bool ResetSyncCheckpoint()
 {
     LOCK(cs_hashSyncCheckpoint);
@@ -321,7 +320,7 @@ bool SetCheckpointPrivKey(std::string strPrivKey)
     return true;
 }
 
-bool SendSyncCheckpoint(uint256 hashCheckpoint)
+bool SendSyncCheckpoint(uint256 hashCheckpoint, CConnman* connman)
 {
     CSyncCheckpoint checkpoint;
     checkpoint.hashCheckpoint = hashCheckpoint;
@@ -348,7 +347,7 @@ bool SendSyncCheckpoint(uint256 hashCheckpoint)
     }
 
     // Relay checkpoint
-    g_connman->ForEachNode([&checkpoint](CNode* pnode) {
+    connman->ForEachNode([&checkpoint](CNode* pnode) {
         checkpoint.RelayTo(pnode);
     });
     return true;
@@ -364,7 +363,7 @@ bool IsSyncCheckpointTooOld(unsigned int nSeconds)
     return (pindexSync->GetBlockTime() + nSeconds < GetAdjustedTime());
 }
 
-// bitconnect: verify signature of sync-checkpoint message
+// peercoin: verify signature of sync-checkpoint message
 bool CSyncCheckpoint::CheckSignature()
 {
     std::string strMasterPubKey = Params().NetworkIDString() == CBaseChainParams::TESTNET ? CSyncCheckpoint::strTestPubKey : CSyncCheckpoint::strMainPubKey;
@@ -378,7 +377,7 @@ bool CSyncCheckpoint::CheckSignature()
     return true;
 }
 
-// bitconnect: process synchronized checkpoint
+// peercoin: process synchronized checkpoint
 bool CSyncCheckpoint::ProcessSyncCheckpoint(CNode* pfrom)
 {
     if (!CheckSignature())

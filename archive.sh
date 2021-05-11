@@ -1,4 +1,4 @@
 #!/bin/bash -ev
 
-git archive --format=tar.gz -o bitconnect.tar.gz --prefix=/bitconnect/ HEAD .
+git archive --format=tar.gz -o peercoin.tar.gz --prefix=/peercoin/ HEAD .
 

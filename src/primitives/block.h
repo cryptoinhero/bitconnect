@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2017 The Bitcoin Core developers
+// Copyright (c) 2009-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -28,11 +28,11 @@ public:
     uint32_t nBits;
     uint32_t nNonce;
 
-    // bitconnect: A copy from CBlockIndex.nFlags from other clients. We need this information because we are using headers-first syncronization.
-    int32_t nFlags;
-    // bitconnect: Used in CheckProofOfStake().
+    // peercoin: A copy from CBlockIndex.nFlags from other clients. We need this information because we are using headers-first syncronization.
+    uint32_t nFlags;
+    // peercoin: Used in CheckProofOfStake().
     static const int32_t NORMAL_SERIALIZE_SIZE=80;
-    static const int32_t CURRENT_VERSION=6;
+    static const int32_t CURRENT_VERSION=3;
 
     CBlockHeader()
     {
@@ -50,7 +50,7 @@ public:
         READWRITE(nBits);
         READWRITE(nNonce);
 
-        // bitconnect: do not serialize nFlags when computing hash
+        // peercoin: do not serialize nFlags when computing hash
         if (!(s.GetType() & SER_GETHASH) && s.GetType() & SER_POSMARKER)
             READWRITE(nFlags);
     }
@@ -86,7 +86,7 @@ public:
     // network and disk
     std::vector<CTransactionRef> vtx;
 
-    // bitconnect: block signature - signed by coin base txout[0]'s owner
+    // peercoin: block signature - signed by coin base txout[0]'s owner
     std::vector<unsigned char> vchBlockSig;
 
     // memory only
@@ -100,14 +100,14 @@ public:
     CBlock(const CBlockHeader &header)
     {
         SetNull();
-        *((CBlockHeader*)this) = header;
+        *(static_cast<CBlockHeader*>(this)) = header;
     }
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITE(*(CBlockHeader*)this);
+        READWRITEAS(CBlockHeader, *this);
         READWRITE(vtx);
         READWRITE(vchBlockSig);
     }
@@ -133,7 +133,7 @@ public:
         return block;
     }
 
-    // bitconnect: two types of block: proof-of-work or proof-of-stake
+    // peercoin: two types of block: proof-of-work or proof-of-stake
     bool IsProofOfStake() const
     {
         return (vtx.size() > 1 && vtx[1]->IsCoinStake());
@@ -149,7 +149,7 @@ public:
         return IsProofOfStake() ? std::make_pair(vtx[1]->vin[0].prevout, vtx[1]->nTime) : std::make_pair(COutPoint(), (unsigned int)0);
     }
 
-    // bitconnect: get max transaction timestamp
+    // peercoin: get max transaction timestamp
     int64_t GetMaxTransactionTime() const
     {
         int64_t maxTransactionTime = 0;
@@ -158,7 +158,7 @@ public:
         return maxTransactionTime;
     }
 
-    unsigned int GetStakeEntropyBit() const; // bitconnect: entropy bit for stake modifier if chosen by modifier
+    unsigned int GetStakeEntropyBit() const; // peercoin: entropy bit for stake modifier if chosen by modifier
 
     std::string ToString() const;
 };

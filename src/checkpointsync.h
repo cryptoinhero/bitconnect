@@ -1,8 +1,8 @@
-// Copyright (c) 2012-2020 The Peercoin developers
+// Copyright (c) 2012-2021 The Peercoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef BITCONNECT_CHECKPOINTSYNC_H
-#define BITCONNECT_CHECKPOINTSYNC_H
+#ifndef PEERCOIN_CHECKPOINTSYNC_H
+#define PEERCOIN_CHECKPOINTSYNC_H
 
 #define CHECKPOINT_MAX_SPAN (60 * 60 * 4) // max 4 hours before latest block
 
@@ -15,7 +15,7 @@ class CSyncCheckpoint;
 extern uint256 hashSyncCheckpoint;
 extern CSyncCheckpoint checkpointMessage;
 extern uint256 hashInvalidCheckpoint;
-extern CCriticalSection cs_hashSyncCheckpoint;
+extern RecursiveMutex cs_hashSyncCheckpoint;
 extern std::string strCheckpointWarning;
 
 CBlockIndex* GetLastSyncCheckpoint();
@@ -110,13 +110,13 @@ public:
         return Hash(this->vchMsg.begin(), this->vchMsg.end());
     }
 
-    bool RelayTo(CNode* pnode) const
+    bool RelayTo(CNode* pnode, CConnman* connman) const
     {
         // returns true if wasn't already sent
-        if (g_connman && pnode->hashCheckpointKnown != hashCheckpoint)
+        if (pnode->hashCheckpointKnown != hashCheckpoint)
         {
             pnode->hashCheckpointKnown = hashCheckpoint;
-            g_connman->PushMessage(pnode, CNetMsgMaker(pnode->GetSendVersion()).Make("checkpoint", *this));
+            connman->PushMessage(pnode, CNetMsgMaker(pnode->GetSendVersion()).Make("checkpoint", *this));
             return true;
         }
         return false;
@@ -126,4 +126,4 @@ public:
     bool ProcessSyncCheckpoint(CNode* pfrom);
 };
 
-#endif // BITCONNECT_CHECKPOINTSYNC_H
+#endif // PEERCOIN_CHECKPOINTSYNC_H

@@ -1,8 +1,8 @@
-// Copyright (c) 2012-2020 The Peercoin developers
+// Copyright (c) 2012-2021 The Peercoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef BITCONNECT_QT_MULTISIGDIALOG_H
-#define BITCONNECT_QT_MULTISIGDIALOG_H
+#ifndef PEERCOIN_QT_MULTISIGDIALOG_H
+#define PEERCOIN_QT_MULTISIGDIALOG_H
 
 //#include "multisigaddressentry.h"
 //#include "multisiginputentry.h"
@@ -63,4 +63,4 @@ private:
     void updateAmounts();
 };
 
-#endif // BITCONNECT_QT_MULTISIGDIALOG_H
+#endif // PEERCOIN_QT_MULTISIGDIALOG_H
