@@ -193,7 +193,7 @@ void SplashScreen::subscribeToCoreSignals()
 {
     // Connect signals to client
     uiInterface.InitMessage.connect(boost::bind(InitMessage, this, _1));
-    uiInterface.ShowProgress.connect(boost::bind(ShowProgress, this,boost::placeholders::_1,boost::placeholders::_2,_3));
+    uiInterface.ShowProgress.connect(boost::bind(ShowProgress, this,boost::placeholders::_1,boost::placeholders::_2,boost::placeholders::_3));
 #ifdef ENABLE_WALLET
     uiInterface.LoadWallet.connect(boost::bind(&SplashScreen::ConnectWallet, this, _1));
 #endif
@@ -203,7 +203,7 @@ void SplashScreen::unsubscribeFromCoreSignals()
 {
     // Disconnect signals from client
     uiInterface.InitMessage.disconnect(boost::bind(InitMessage, this, _1));
-    uiInterface.ShowProgress.disconnect(boost::bind(ShowProgress, this,boost::placeholders::_1,boost::placeholders::_2,_3));
+    uiInterface.ShowProgress.disconnect(boost::bind(ShowProgress, this,boost::placeholders::_1,boost::placeholders::_2,boost::placeholders::_3));
 #ifdef ENABLE_WALLET
     for (CWallet* const & pwallet : connectedWallets) {
         pwallet->ShowProgress.disconnect(boost::bind(ShowProgress, this,boost::placeholders::_1,boost::placeholders::_2,false));
